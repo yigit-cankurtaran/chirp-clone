@@ -6,9 +6,11 @@ import { SignIn } from "@clerk/nextjs";
 import { api } from "~/utils/api";
 
 const Home: NextPage = () => {
-  const hello = api.example.hello.useQuery({ text: "from tRPC" });
-
   const user = useUser();
+
+  const { data } = api.posts.getAll.useQuery();
+  // TRPC lets you create functions that run on the server that can get data from anywhere.
+  // The user should NEVER be able to access the database directly.
 
   return (
     <>
@@ -24,6 +26,11 @@ const Home: NextPage = () => {
           {!!user.isSignedIn && <UserButton />}{" "}
         </div>
         <SignIn path="/sign-in" routing="path" signUpUrl="/sign-up" />
+        <div>
+          {data?.map((post) => (
+            <div key={post.id}>{post.content}</div>
+          ))}
+        </div>
       </main>
     </>
   );
