@@ -8,6 +8,7 @@ import type { RouterOutputs } from "~/utils/api";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import Image from "next/image";
+import { LoadingPage } from "~/components/loading";
 
 dayjs.extend(relativeTime);
 
@@ -55,16 +56,32 @@ const PostView = (props: PostWithUser) => {
   );
 };
 
-const Home: NextPage = () => {
-  const user = useUser();
+const Feed = () => {
+  const { data, isLoading: postsLoading } = api.posts.getAll.useQuery();
 
-  const { data, isLoading } = api.posts.getAll.useQuery();
+  if (postsLoading) return <LoadingPage />;
+
+  if (!data) return <div>Something went wrong</div>;
+  return (
+    <div className="flex flex-col">
+      {[...data].map((fullPost) => (
+        <PostView {...fullPost} key={fullPost.post.id} />
+      ))}
+      {/* mapping stuff from the database into each post */}
+    </div>
+  );
+};
+
+const Home: NextPage = () => {
+  const { isLoaded: userLoaded, isSignedIn } = useUser();
+
+  // fetch data as soon as the page loads
+  api.posts.getAll.useQuery();
   // TRPC lets you create functions that run on the server that can get data from anywhere.
   // The user should NEVER be able to access the database directly.
 
-  if (!data || isLoading) {
-    return <div>Loading...</div>;
-  }
+  // return empty div if user is not loaded
+  if (!userLoaded) return <div />;
 
   return (
     <>
@@ -77,16 +94,11 @@ const Home: NextPage = () => {
         <div className="h-full w-full border-x border-slate-400 md:max-w-2xl">
           <div className="flex justify-center border-b border-slate-400 p-4">
             {" "}
-            {!user.isSignedIn && <SignInButton />}
-            {user.isSignedIn && <CreatePostWizard />}{" "}
+            {!isSignedIn && <SignInButton />}
+            {isSignedIn && <CreatePostWizard />}{" "}
           </div>
           <SignIn path="/sign-in" routing="path" signUpUrl="/sign-up" />
-          <div className="flex flex-col">
-            {data?.map((fullPost) => (
-              <PostView {...fullPost} key={fullPost.post.id} />
-            ))}
-            {/* mapping stuff from the database into each post */}
-          </div>
+          <Feed />
         </div>
       </main>
     </>
