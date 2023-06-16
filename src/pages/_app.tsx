@@ -5,10 +5,15 @@ import { api } from "~/utils/api";
 
 import "~/styles/globals.css";
 import { Toaster } from "react-hot-toast";
+import Head from "next/head";
 
 const MyApp: AppType = ({ Component, pageProps }) => {
   return (
     <ClerkProvider {...pageProps}>
+      <Head>
+        <title>Chirp Clone</title>
+        <meta name="description" content="⌨️" />
+      </Head>
       <Toaster position="bottom-center" />
       <Component {...pageProps} />
     </ClerkProvider>
