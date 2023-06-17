@@ -6,29 +6,9 @@ import { Redis } from "@upstash/redis";
 
 import { createTRPCRouter, privateProcedure, publicProcedure } from "~/server/api/trpc";
 import { filterUserForClient } from "~/server/helpers/filterUserForClient";
+import type { Post } from "@prisma/client";
 
-// need to filter down posts to only the ones that the user has access to
-// this is where i'm leaving off for today
-
-// Create a ratelimiter that allows 3 requests every 1 minute
-const ratelimit = new Ratelimit({
-  redis: Redis.fromEnv(),
-  limiter: Ratelimit.slidingWindow(3, "1 m"),
-  analytics: true,
-})
-
-
-
-export const postsRouter = createTRPCRouter({
-    // we want everyone to access all the posts
-  getAll: publicProcedure.query(async ({ ctx }) => {
-    const posts = await ctx.prisma.post.findMany({
-      take: 20,
-      orderBy: [
-        {createdAt: "desc"}
-      ]
-    });
-    // example doesn't exist because we deleted it
+const addUserDataToPosts = async (posts: Post[]) => {
     const users = (await clerkClient.users.getUserList({
       userId: posts.map((post) => post.authorId),
       limit: 20,
@@ -41,11 +21,49 @@ export const postsRouter = createTRPCRouter({
 
       return {  
       post,
-      author,
-      // for each post, find the user that matches the authorId
-      };
+      author: {
+        ...author,
+        username: author.username,
+      },
+}
+    })
+}
+
+
+
+// need to filter down posts to only the ones that the user has access to
+
+// Create a ratelimiter that allows 3 requests every 1 minute
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(3, "1 m"),
+  analytics: true,
+})
+
+export const postsRouter = createTRPCRouter({
+    // we want everyone to access all the posts
+  getAll: publicProcedure.query(async ({ ctx }) => {
+    const posts = await ctx.prisma.post.findMany({
+      take: 20,
+      orderBy: [
+        {createdAt: "desc"}
+      ]
     });
-  }),
+    // example doesn't exist because we deleted it
+      // for each post, find the user that matches the authorId
+    return addUserDataToPosts(posts);
+    }),
+
+  getPostsByUserId: publicProcedure.input(z.object({
+    userId: z.string(),
+  })).query(async ({ ctx, input}) => ctx.prisma.post.findMany({
+    where: {
+      authorId: input.userId,
+    },
+    take: 20,
+    orderBy: [{createdAt: "desc"}],
+  }).then(addUserDataToPosts)
+  ),
 
   create: privateProcedure.input(z.object({
     content: z.string().emoji("Only emojis are allowed").min(1).max(280),
@@ -61,5 +79,5 @@ export const postsRouter = createTRPCRouter({
     });
     return post;
     // Leaving off here for today
-  })
+  }),
 });
